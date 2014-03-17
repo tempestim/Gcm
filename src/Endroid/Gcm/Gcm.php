@@ -92,14 +92,13 @@ class Gcm
         // Chunk number of registration ID's according to the maximum allowed by GCM
         $chunks = array_chunk($registrationIds, $this->registrationIdMaxCount);
 
-        // Perform the calls (in parallel)
+        // Perform the calls
         $this->responses = array();
         foreach ($chunks as $registrationIds) {
             $data['registration_ids'] = $registrationIds;
             $this->responses[] = $this->browser->post($this->apiUrl, $headers, json_encode($data));
         }
-        $this->browser->getClient()->flush();
-
+        
         // Determine success
         foreach ($this->responses as $response) {
             $message = json_decode($response->getContent());
