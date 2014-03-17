@@ -10,7 +10,7 @@
 namespace Endroid\Gcm;
 
 use Buzz\Browser;
-use Buzz\Client\Curl;
+use Buzz\Client\FileGetContents;
 
 class Gcm
 {
@@ -40,6 +40,18 @@ class Gcm
     protected $responses;
 
     /**
+     * Sent registration ids 
+     * @var array
+     */
+    protected $registrationIds = array();
+
+    /**
+     * Associatives array for id => errors
+     * @var array
+     */
+    protected $registrationErrors;
+
+    /**
      * Class constructor
      *
      * @param $apiKey
@@ -53,7 +65,7 @@ class Gcm
             $this->apiUrl = $apiUrl;
         }
 
-        $this->browser = new Browser(new Curl());
+        $this->browser = new Browser(new FileGetContents());
     }
 
     /**
@@ -66,6 +78,8 @@ class Gcm
      */
     public function send($data, array $registrationIds, array $options = array())
     {
+        $this->registrationIds = $registrationIds;
+        
         $headers = array(
             'Authorization: key='.$this->apiKey,
             'Content-Type: application/json'
@@ -84,7 +98,7 @@ class Gcm
             $data['registration_ids'] = $registrationIds;
             $this->responses[] = $this->browser->post($this->apiUrl, $headers, json_encode($data));
         }
-        //$this->browser->getClient()->flush();
+        $this->browser->getClient()->flush();
 
         // Determine success
         foreach ($this->responses as $response) {
@@ -95,6 +109,29 @@ class Gcm
         }
 
         return true;
+    }
+    
+    /**
+     * Return Ids associated with errors
+     *
+     * @return array RegistrationIds => Error
+     */
+    public function getRegistrationIdsAssociatedResponse(){
+        $this->registrationErrors = array();
+        $i = 0;
+        foreach ($this->responses as $response) {
+            $message = json_decode($response->getContent());
+            if ($message !== null && isset($message->results)){
+                foreach($message->results as $result){
+                    if (isset($this->registrationIds[$i]) && isset($result->error)){
+                        $device_id = $this->registrationIds[$i];
+                        $this->registrationErrors[$device_id] = $result->error;
+                        $i++;
+                    }
+                }
+            }
+        }
+        return $this->registrationErrors;
     }
 
     /**
